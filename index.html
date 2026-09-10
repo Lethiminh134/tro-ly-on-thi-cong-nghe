@@ -1,0 +1,2516 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ÔN THI CÔNG NGHỆ 12 - Trợ lý ôn thi Công nghệ Nông nghiệp 12</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            200: '#bbf7d0',
+                            300: '#86efac',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            800: '#166534',
+                            900: '#14532d',
+                        },
+                        agri: {
+                            earth: '#78350f',
+                            leaf: '#15803d',
+                            sky: '#0284c7',
+                            sun: '#f59e0b',
+                            mint: '#a7f3d0'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for Learning Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS for Excel Import/Export -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- Mammoth.js for Word (.docx) Import -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <!-- Canvas Confetti for Achievements -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+
+        .pulse-slow {
+            animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800 flex flex-col antialiased selection:bg-emerald-500 selection:text-white">
+
+    <!-- Top Sync & Offline Status Bar -->
+    <div id="status-bar" class="bg-emerald-800 text-white text-xs px-4 py-1 flex justify-between items-center z-50 sticky top-0 shadow-sm">
+        <div class="flex items-center space-x-2">
+            <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            <span id="sync-text" class="font-medium">🌱 Chế độ Cục bộ (Offline-first / IndexedDB)</span>
+        </div>
+        <div class="flex items-center space-x-4">
+            <span id="network-badge" class="bg-emerald-700/80 px-2 py-0.5 rounded text-[11px] font-semibold flex items-center gap-1">
+                <i class="fa-solid fa-wifi text-[10px]"></i> <span id="network-status">Đang trực tuyến</span>
+            </span>
+            <button onclick="app.toggleTheme()" class="hover:text-emerald-200 transition-colors title='Đổi giao diện'">
+                <i class="fa-solid fa-moon dark:hidden"></i>
+                <i class="fa-solid fa-sun hidden dark:inline"></i>
+            </button>
+            <span id="save-indicator" class="text-emerald-200 text-[11px]"><i class="fa-solid fa-check"></i> Đã lưu</span>
+        </div>
+    </div>
+
+    <!-- Main Navigation & Application Wrapper -->
+    <div id="app" class="flex-1 flex flex-col min-h-0">
+        <!-- Rendered dynamically via JS -->
+    </div>
+
+    <!-- Notification Toast Container -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
+    <!-- Modal Container -->
+    <div id="modal-container" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden">
+        <!-- Dynamic modal popup inside -->
+    </div>
+
+    <script>
+        /**
+         * INDEXEDDB STORAGE ENGINE
+         */
+        class LocalDB {
+            constructor() {
+                this.dbName = 'AgriTech12_DB';
+                this.version = 1;
+                this.db = null;
+            }
+
+            async init() {
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(this.dbName, this.version);
+
+                    request.onupgradeneeded = (e) => {
+                        const db = e.target.result;
+                        const stores = [
+                            'users', 'classes', 'students', 'topics', 
+                            'questions', 'exams', 'assignments', 
+                            'attempts', 'results', 'settings'
+                        ];
+                        stores.forEach(store => {
+                            if (!db.objectStoreNames.contains(store)) {
+                                db.createObjectStore(store, { keyPath: 'id' });
+                            }
+                        });
+                    };
+
+                    request.onsuccess = (e) => {
+                        this.db = e.target.result;
+                        resolve(this.db);
+                    };
+
+                    request.onerror = (e) => reject('IndexedDB Init Error: ' + e.target.error);
+                });
+            }
+
+            async getAll(storeName) {
+                return new Promise((resolve, reject) => {
+                    const tx = this.db.transaction(storeName, 'readonly');
+                    const store = tx.objectStore(storeName);
+                    const req = store.getAll();
+                    req.onsuccess = () => resolve(req.result || []);
+                    req.onerror = () => reject(req.error);
+                });
+            }
+
+            async get(storeName, id) {
+                return new Promise((resolve, reject) => {
+                    const tx = this.db.transaction(storeName, 'readonly');
+                    const store = tx.objectStore(storeName);
+                    const req = store.get(id);
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error);
+                });
+            }
+
+            async put(storeName, item) {
+                return new Promise((resolve, reject) => {
+                    if (!item.id) item.id = 'id_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                    item.updatedAt = new Date().toISOString();
+                    if (!item.createdAt) item.createdAt = item.updatedAt;
+
+                    const tx = this.db.transaction(storeName, 'readwrite');
+                    const store = tx.objectStore(storeName);
+                    const req = store.put(item);
+                    req.onsuccess = () => {
+                        app.showSaveIndicator();
+                        resolve(item);
+                    };
+                    req.onerror = () => reject(req.error);
+                });
+            }
+
+            async delete(storeName, id) {
+                return new Promise((resolve, reject) => {
+                    const tx = this.db.transaction(storeName, 'readwrite');
+                    const store = tx.objectStore(storeName);
+                    const req = store.delete(id);
+                    req.onsuccess = () => {
+                        app.showSaveIndicator();
+                        resolve(true);
+                    };
+                    req.onerror = () => reject(req.error);
+                });
+            }
+
+            async clearStore(storeName) {
+                return new Promise((resolve, reject) => {
+                    const tx = this.db.transaction(storeName, 'readwrite');
+                    const store = tx.objectStore(storeName);
+                    const req = store.clear();
+                    req.onsuccess = () => resolve(true);
+                    req.onerror = () => reject(req.error);
+                });
+            }
+        }
+
+        const SEED_DATA = {
+            classes: [
+                {
+                    id: 'class_12a1',
+                    name: 'Lớp 12A1 - Nông nghiệp 4.0',
+                    code: 'CN12A1',
+                    teacherName: 'ThS. Nguyễn Văn Lâm',
+                    schoolYear: '2025-2026',
+                    description: 'Lớp chuyên sâu ứng dụng Công nghệ Sinh học & Công nghệ cao trong Nông nghiệp',
+                    studentCount: 5,
+                    coverImage: 'https://images.unsplash.com/photo-1586771107445-d3ca888129ff?w=600&auto=format&fit=crop'
+                },
+                {
+                    id: 'class_12a2',
+                    name: 'Lớp 12A2 - Kỹ thuật Lâm Thủy Sản',
+                    code: 'CN12A2',
+                    teacherName: 'Cô Trần Thị Hoa',
+                    schoolYear: '2025-2026',
+                    description: 'Lớp ôn tập hướng nghiệp Quản lý Lâm nghiệp & Thủy sản bền vững',
+                    studentCount: 4,
+                    coverImage: 'https://images.unsplash.com/photo-1530836369250-ef72a3f5cda8?w=600&auto=format&fit=crop'
+                }
+            ],
+            students: [
+                { id: 'std_01', classId: 'class_12a1', name: 'Nguyễn Văn Hải', studentCode: 'HS1201', gender: 'Nam', notes: 'Giỏi phần Trồng trọt công nghệ cao' },
+                { id: 'std_02', classId: 'class_12a1', name: 'Lê Thi Bích', studentCode: 'HS1202', gender: 'Nữ', notes: 'Học sinh tích cực' },
+                { id: 'std_03', classId: 'class_12a1', name: 'Phạm Quốc Bảo', studentCode: 'HS1203', gender: 'Nam', notes: 'Cần củng cố kiến thức Chăn nuôi' },
+                { id: 'std_04', classId: 'class_12a1', name: 'Hoàng Minh Châu', studentCode: 'HS1204', gender: 'Nữ', notes: 'Cần nâng cao kỹ năng xử lý môi trường' },
+                { id: 'std_05', classId: 'class_12a1', name: 'Đỗ Đức Dương', studentCode: 'HS1205', gender: 'Nam', notes: 'Chăm chỉ ôn luyện' },
+                { id: 'std_06', classId: 'class_12a2', name: 'Vũ Thị Ánh', studentCode: 'HS1206', gender: 'Nữ', notes: 'Trưởng nhóm Lâm nghiệp' },
+                { id: 'std_07', classId: 'class_12a2', name: 'Trịnh Tấn Phát', studentCode: 'HS1207', gender: 'Nam', notes: 'Giỏi phần Nuôi trồng Thủy sản' },
+                { id: 'std_08', classId: 'class_12a2', name: 'Ngô Thanh Hà', studentCode: 'HS1208', gender: 'Nữ', notes: 'Cần cải thiện thời gian làm bài' },
+                { id: 'std_09', classId: 'class_12a2', name: 'Bùi Anh Tuấn', studentCode: 'HS1209', gender: 'Nam', notes: 'Hoàn thành bài tập đúng hạn' }
+            ],
+            topics: [
+                { id: 'topic_01', title: 'Chủ đề 1: Trồng trọt Công nghệ cao & Thủy canh', description: 'Kỹ thuật thủy canh, khí canh, nhà kính thông minh và điều khiển tự động.' },
+                { id: 'topic_02', title: 'Chủ đề 2: Chăn nuôi Hiện đại & Thú y', description: 'Quy trình chăn nuôi an toàn sinh học, dinh dưỡng & phòng trừ dịch bệnh.' },
+                { id: 'topic_03', title: 'Chủ đề 3: Lâm nghiệp & Bảo vệ Rừng', description: 'Kỹ thuật trồng rừng, quản lý tài nguyên rừng & phòng cháy chữa cháy rừng.' },
+                { id: 'topic_04', title: 'Chủ đề 4: Nuôi trồng Thủy sản Bền vững', description: 'Quy trình nuôi tôm, cá công nghệ cao & quản lý chất lượng nước.' },
+                { id: 'topic_05', title: 'Chủ đề 5: Công nghệ Sinh học & Môi trường Nông nghiệp', description: 'Vi sinh vật có lợi, xử lý chất thải nông nghiệp & mô hình tuần hoàn.' }
+            ],
+            questions: [
+                {
+                    id: 'q_01',
+                    topicId: 'topic_01',
+                    type: 'mcq',
+                    cognitiveLevel: 'Thông hiểu',
+                    content: 'Ưu điểm lớn nhất của công nghệ trồng cây Thủy canh so với trồng trọt truyền thống trong đất là gì?',
+                    options: [
+                        'A. Không cần cung cấp ánh sáng cho cây trồng',
+                        'B. Tiết kiệm nước, dinh dưỡng và không bị ô nhiễm vi sinh vật từ đất',
+                        'C. Cây không bao giờ bị sâu bệnh hại',
+                        'D. Có thể trồng tất cả các loại cây gỗ to lấy gỗ'
+                    ],
+                    correctAnswer: 'B',
+                    explanation: 'Thủy canh giúp kiểm soát tối ưu nguồn dinh dưỡng dạng dung dịch, tiết kiệm tới 80% nước và cách ly các mầm bệnh truyền qua môi trường đất.'
+                },
+                {
+                    id: 'q_02',
+                    topicId: 'topic_01',
+                    type: 'mcq',
+                    cognitiveLevel: 'Nhận biết',
+                    content: 'Hệ thống Khí canh (Aeroponics) cung cấp chất dinh dưỡng cho rễ cây dưới dạng nào?',
+                    options: [
+                        'A. Dạng viên nén tan chậm',
+                        'B. Dạng ngập tưới định kỳ',
+                        'C. Dạng sương mù hạt nhỏ bám trực tiếp vào rễ',
+                        'D. Dạng chảy liên tục thành dòng'
+                    ],
+                    correctAnswer: 'C',
+                    explanation: 'Trong hệ thống khí canh, dung dịch dinh dưỡng được phun thành dạng sương mù mịn bao bọc lấy rễ cây lơ lửng trong không khí.'
+                },
+                {
+                    id: 'q_03',
+                    topicId: 'topic_02',
+                    type: 'mcq',
+                    cognitiveLevel: 'Vận dụng',
+                    content: 'Biện pháp quan trọng nhất trong mô hình chăn nuôi An toàn Sinh học nhằm ngăn chặn mầm bệnh lây lan là gì?',
+                    options: [
+                        'A. Tăng liều lượng kháng sinh định kỳ trong thức ăn',
+                        'B. Kiểm soát chặt chẽ người, phương tiện vào trại và tiêm phòng đầy đủ',
+                        'C. Cho vật nuôi uống nước chưa qua xử lý',
+                        'D. Mở cửa chuồng trại thông thoáng hoàn toàn không chắn lưới'
+                    ],
+                    correctAnswer: 'B',
+                    explanation: 'An toàn sinh học nhấn mạnh việc cách ly nguồn lây (con người, xe cộ, dụng cụ) kết hợp vắc xin chủ động bảo vệ đàn vật nuôi.'
+                },
+                {
+                    id: 'q_04',
+                    topicId: 'topic_03',
+                    type: 'mcq',
+                    cognitiveLevel: 'Thông hiểu',
+                    content: 'Trong quản lý và phát triển Lâm nghiệp bền vững, chức năng quan trọng nhất của Rừng Phòng hộ đầu nguồn là:',
+                    options: [
+                        'A. Cung cấp gỗ nguyên liệu cho xuất khẩu',
+                        'B. Bắt động vật hoang dã làm thực phẩm',
+                        'C. Giữ đất, chống xói mòn, điều tiết nguồn nước và hạn chế lũ lụt',
+                        'D. Làm khu vui chơi nghỉ dưỡng cao cấp'
+                    ],
+                    correctAnswer: 'C',
+                    explanation: 'Rừng phòng hộ đầu nguồn đóng vai trò lá chắn sinh thái, điều hòa dòng chảy mùa mưa lũ và bảo vệ tài nguyên đất đai.'
+                },
+                {
+                    id: 'q_05',
+                    topicId: 'topic_04',
+                    type: 'mcq',
+                    cognitiveLevel: 'Nhận biết',
+                    content: 'Công nghệ Biofloc trong nuôi trồng thủy sản có tác dụng chủ yếu nào sau đây?',
+                    options: [
+                        'A. Tăng màu nhân tạo cho nước ao nuôi',
+                        'B. Sử dụng vi sinh vật dị dưỡng để xử lý chất thải hữu cơ và tái tạo protein làm thức ăn',
+                        'C. Diệt sạch toàn bộ sinh vật trong ao nuôi',
+                        'D. Giảm độ mặn của nước biển'
+                    ],
+                    correctAnswer: 'B',
+                    explanation: 'Biofloc tận dụng các khối vi khuẩn có lợi để biến amoni độc hại thành sinh khối vi khuẩn giàu đạm cho tôm/cá ăn.'
+                },
+                {
+                    id: 'q_06',
+                    topicId: 'topic_05',
+                    type: 'mcq',
+                    cognitiveLevel: 'Thông hiểu',
+                    content: 'Khí Biogas thu được từ quá trình phân hủy chất thải chăn nuôi bằng hầm ủ yếm khí chứa thành phần chính là khí nào?',
+                    options: [
+                        'A. Khí Ôxi (O2)',
+                        'B. Khí Mêtan (CH4) và Cacbonic (CO2)',
+                        'C. Khí Nitơ (N2)',
+                        'D. Khí Clo (Cl2)'
+                    ],
+                    correctAnswer: 'B',
+                    explanation: 'Vi khuẩn yếm khí phân giải chất hữu cơ thải ra CH4 (chiếm 50-70%) có thể dùng đun nấu hoặc phát điện sạch.'
+                }
+            ],
+            exams: [
+                {
+                    id: 'exam_01',
+                    title: 'Đề Ôn Tập Số 01 - Tổng hợp Công nghệ Nông nghiệp 12',
+                    topicId: 'topic_01',
+                    timeLimit: 15, // minutes
+                    questionIds: ['q_01', 'q_02', 'q_03', 'q_04', 'q_05', 'q_06'],
+                    createdByName: 'ThS. Nguyễn Văn Lâm',
+                    passScore: 5.0
+                }
+            ],
+            assignments: [
+                {
+                    id: 'assign_01',
+                    examId: 'exam_01',
+                    classId: 'class_12a1',
+                    studentId: null, // assigned to all class
+                    title: 'Bài kiểm tra giữa kỳ 1 - Công nghệ Nông nghiệp 12',
+                    startTime: new Date(Date.now() - 3600000 * 24).toISOString(),
+                    endTime: new Date(Date.now() + 3600000 * 24 * 7).toISOString(),
+                    allowReview: true,
+                    maxAttempts: 3
+                }
+            ]
+        };
+
+        class AgriApp {
+            constructor() {
+                this.db = new LocalDB();
+                this.currentUser = { role: 'teacher', name: 'Giáo viên Demo', id: 'teacher_main' };
+                this.currentView = 'login';
+                this.selectedClassId = 'class_12a1';
+                this.audioEnabled = true;
+                this.activeExamSession = null;
+                this.timerInterval = null;
+            }
+
+            async start() {
+                await this.db.init();
+                await this.checkSeedData();
+                this.setupEventListeners();
+                this.checkOnlineStatus();
+                this.render();
+            }
+
+            async checkSeedData() {
+                const classes = await this.db.getAll('classes');
+                if (classes.length === 0) {
+                    console.log('Seeding initial agricultural technology data...');
+                    for (let c of SEED_DATA.classes) await this.db.put('classes', c);
+                    for (let s of SEED_DATA.students) await this.db.put('students', s);
+                    for (let t of SEED_DATA.topics) await this.db.put('topics', t);
+                    for (let q of SEED_DATA.questions) await this.db.put('questions', q);
+                    for (let e of SEED_DATA.exams) await this.db.put('exams', e);
+                    for (let a of SEED_DATA.assignments) await this.db.put('assignments', a);
+                }
+            }
+
+            checkOnlineStatus() {
+                const updateStatus = () => {
+                    const isOnline = navigator.onLine;
+                    const el = document.getElementById('network-status');
+                    if (el) {
+                        el.innerText = isOnline ? 'Đang trực tuyến' : 'Đang ngoại tuyến (Offline)';
+                        el.parentElement.className = isOnline 
+                            ? 'bg-emerald-700/80 px-2 py-0.5 rounded text-[11px] font-semibold flex items-center gap-1'
+                            : 'bg-amber-600/90 px-2 py-0.5 rounded text-[11px] font-semibold flex items-center gap-1 animate-pulse';
+                    }
+                };
+                window.addEventListener('online', updateStatus);
+                window.addEventListener('offline', updateStatus);
+                updateStatus();
+            }
+
+            showSaveIndicator() {
+                const ind = document.getElementById('save-indicator');
+                if (ind) {
+                    ind.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...';
+                    setTimeout(() => {
+                        ind.innerHTML = '<i class="fa-solid fa-check"></i> Đã lưu local';
+                    }, 400);
+                }
+            }
+
+            toast(msg, type = 'success') {
+                const container = document.getElementById('toast-container');
+                if (!container) return;
+
+                const toast = document.createElement('div');
+                const bgColor = type === 'success' ? 'bg-emerald-600' : type === 'error' ? 'bg-rose-600' : 'bg-sky-600';
+                const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-triangle' : 'fa-info-circle';
+
+                toast.className = `${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center justify-between text-sm transition-all duration-300 transform translate-y-2 pointer-events-auto opacity-95`;
+                toast.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid ${icon}"></i>
+                        <span>${msg}</span>
+                    </div>
+                    <button onclick="this.parentElement.remove()" class="ml-4 opacity-70 hover:opacity-100"><i class="fa-solid fa-xmark"></i></button>
+                `;
+
+                container.appendChild(toast);
+                this.playSound(type === 'success' ? 'pop' : 'alert');
+
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    toast.style.transform = 'translateY(-10px)';
+                    setTimeout(() => toast.remove(), 300);
+                }, 3500);
+            }
+
+            playSound(type) {
+                if (!this.audioEnabled) return;
+                try {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+
+                    if (type === 'pop') {
+                        osc.frequency.setValueAtTime(440, ctx.currentTime);
+                        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.1);
+                        gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                        gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+                        osc.start();
+                        osc.stop(ctx.currentTime + 0.1);
+                    } else if (type === 'alert') {
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(300, ctx.currentTime);
+                        osc.frequency.setValueAtTime(150, ctx.currentTime + 0.15);
+                        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                        gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                        osc.start();
+                        osc.stop(ctx.currentTime + 0.3);
+                    }
+                } catch(e) {}
+            }
+
+            toggleTheme() {
+                document.documentElement.classList.toggle('dark');
+            }
+
+            setupEventListeners() {
+                window.addEventListener('beforeunload', (e) => {
+                    if (this.activeExamSession && !this.activeExamSession.isSubmitted) {
+                        e.preventDefault();
+                        e.returnValue = 'Bài thi của bạn đang diễn ra. Bạn có chắc chắn muốn rời đi?';
+                    }
+                });
+            }
+
+            async navigateTo(view, params = {}) {
+                if (this.activeExamSession && !this.activeExamSession.isSubmitted && view !== 'student_take_exam') {
+                    if (!confirm('Bạn đang làm bài thi. Rời trang sẽ nộp bài tự động. Bạn muốn tiếp tục?')) {
+                        return;
+                    }
+                    await this.submitActiveExam();
+                }
+
+                this.currentView = view;
+                this.viewParams = params;
+                await this.render();
+                window.scrollTo(0,0);
+            }
+
+            async render() {
+                const appEl = document.getElementById('app');
+                if (!appEl) return;
+
+                if (this.currentView === 'login') {
+                    appEl.innerHTML = await this.renderLoginView();
+                    return;
+                }
+
+                // Layout with Sidebar & Content
+                appEl.innerHTML = `
+                    <div class="flex-1 flex flex-col md:flex-row min-h-0 bg-slate-100 dark:bg-slate-900">
+                        <!-- Sidebar Header -->
+                        <aside class="w-full md:w-64 bg-slate-900 text-slate-200 flex flex-col flex-shrink-0 shadow-md">
+                            ${this.renderSidebar()}
+                        </aside>
+
+                        <!-- Main Display Area -->
+                        <main class="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar">
+                            ${await this.renderMainContent()}
+                        </main>
+                    </div>
+                `;
+            }
+
+            async renderLoginView() {
+                const classes = await this.db.getAll('classes');
+                const students = await this.db.getAll('students');
+
+                return `
+                    <div class="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-800 to-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
+                        <!-- Decorative background SVG elements -->
+                        <div class="absolute -top-20 -left-20 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                        <div class="absolute -bottom-20 -right-20 w-96 h-96 bg-teal-400/10 rounded-full blur-3xl pointer-events-none"></div>
+
+                        <div class="max-w-md w-full glass-card rounded-2xl p-6 md:p-8 shadow-2xl relative z-10 border border-white/20">
+                            <div class="text-center mb-6">
+                                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-white text-3xl shadow-lg mb-3">
+                                    🌱
+                                </div>
+                                <h1 class="text-2xl font-bold text-slate-900 dark:text-white uppercase tracking-tight">Trợ Lý Ôn Thi</h1>
+                                <p class="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mt-1 uppercase tracking-wider">CÔNG NGHỆ NÔNG NGHIỆP 12</p>
+                                <p class="text-xs text-slate-500 mt-2">Hệ thống quản lý ôn luyện, giao đề & chấm điểm tự động THPT</p>
+                            </div>
+
+                            <!-- Role Toggle Cards -->
+                            <div class="space-y-4">
+                                <div class="bg-white/80 p-4 rounded-xl border border-emerald-100 hover:border-emerald-500 transition-all cursor-pointer shadow-sm group"
+                                     onclick="app.selectRole('teacher', 'teacher_main')">
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-12 h-12 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center text-xl group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                            👨‍🏫
+                                        </div>
+                                        <div class="flex-1">
+                                            <h3 class="font-bold text-slate-800 group-hover:text-emerald-700 transition-colors">Đăng nhập Giáo Viên</h3>
+                                            <p class="text-xs text-slate-500">Quản lý lớp, tạo đề thi, nhập Excel/Word & xem thống kê</p>
+                                        </div>
+                                        <i class="fa-solid fa-chevron-right text-slate-400 group-hover:text-emerald-600"></i>
+                                    </div>
+                                </div>
+
+                                <div class="bg-white/80 p-4 rounded-xl border border-teal-100 hover:border-teal-500 transition-all shadow-sm">
+                                    <div class="flex items-center gap-4 mb-3">
+                                        <div class="w-12 h-12 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center text-xl">
+                                            👩‍🎓
+                                        </div>
+                                        <div class="flex-1">
+                                            <h3 class="font-bold text-slate-800">Đăng nhập Học Sinh</h3>
+                                            <p class="text-xs text-slate-500">Chọn tên học sinh để làm bài và xem tiến bộ</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="space-y-2">
+                                        <label class="text-xs font-semibold text-slate-600">Chọn danh tính Học Sinh Demo:</label>
+                                        <select id="login-student-select" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none">
+                                            ${students.map(s => {
+                                                const cl = classes.find(c => c.id === s.classId);
+                                                return `<option value="${s.id}">${s.name} (${s.studentCode} - ${cl ? cl.name : 'Lớp'})</option>`;
+                                            }).join('')}
+                                        </select>
+                                        <button onclick="app.selectRole('student', document.getElementById('login-student-select').value)" 
+                                                class="w-full mt-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-semibold py-2 rounded-lg text-xs hover:from-teal-700 hover:to-emerald-700 transition-all shadow">
+                                            Vào giao diện Học Sinh <i class="fa-solid fa-arrow-right ml-1"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mt-6 pt-4 border-t border-slate-200/60 text-center text-[11px] text-slate-500 flex justify-between items-center">
+                                <span><i class="fa-solid fa-database"></i> IndexedDB Offline Ready</span>
+                                <span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">Lớp 12 THPT</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            selectRole(role, userId) {
+                this.currentUser.role = role;
+                this.currentUser.id = userId;
+                if (role === 'teacher') {
+                    this.currentUser.name = 'ThS. Nguyễn Văn Lâm (Giáo viên)';
+                    this.navigateTo('teacher_dashboard');
+                } else {
+                    this.db.get('students', userId).then(std => {
+                        if (std) this.currentUser.name = std.name;
+                        this.navigateTo('student_dashboard');
+                    });
+                }
+            }
+
+            renderSidebar() {
+                const isTeacher = this.currentUser.role === 'teacher';
+
+                const teacherNav = [
+                    { id: 'teacher_dashboard', label: 'Tổng quan', icon: 'fa-chart-pie' },
+                    { id: 'classes', label: 'Lớp học', icon: 'fa-school' },
+                    { id: 'students', label: 'Học sinh', icon: 'fa-user-graduate' },
+                    { id: 'topics', label: 'Nội dung ôn tập', icon: 'fa-book-open' },
+                    { id: 'exams', label: 'Kho đề thi', icon: 'fa-file-signature' },
+                    { id: 'question_bank', label: 'Ngân hàng câu hỏi', icon: 'fa-database' },
+                    { id: 'assignments', label: 'Giao bài', icon: 'fa-paper-plane' },
+                    { id: 'analytics', label: 'Phân tích & Kết quả', icon: 'fa-chart-line' },
+                    { id: 'backup', label: 'Sao lưu & Khôi phục', icon: 'fa-floppy-disk' },
+                    { id: 'guide', label: 'Hướng dẫn sử dụng', icon: 'fa-circle-question' }
+                ];
+
+                const studentNav = [
+                    { id: 'student_dashboard', label: 'Trang chủ', icon: 'fa-house' },
+                    { id: 'student_study', label: 'Ôn tập chuyên đề', icon: 'fa-book-bookmark' },
+                    { id: 'student_exams', label: 'Bài tập được giao', icon: 'fa-pen-to-square' },
+                    { id: 'leaderboard', label: 'Bảng xếp hạng', icon: 'fa-trophy' },
+                    { id: 'student_history', label: 'Lịch sử làm bài', icon: 'fa-clock-rotate-left' },
+                    { id: 'guide', label: 'Hướng dẫn học tập', icon: 'fa-circle-question' }
+                ];
+
+                const items = isTeacher ? teacherNav : studentNav;
+
+                return `
+                    <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">🌱</span>
+                            <div>
+                                <h2 class="font-bold text-white text-sm leading-tight">ÔN THI CÔNG NGHỆ 12</h2>
+                                <span class="text-[10px] text-emerald-400 font-medium">${isTeacher ? '👨‍🏫 GIÁO VIÊN' : '👩‍🎓 HỌC SINH'}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-slate-800/60 flex items-center gap-3 border-b border-slate-800 text-xs">
+                        <div class="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center font-bold text-white text-sm">
+                            ${this.currentUser.name.charAt(0)}
+                        </div>
+                        <div class="flex-1 truncate">
+                            <p class="font-semibold text-slate-200 truncate">${this.currentUser.name}</p>
+                            <button onclick="app.navigateTo('login')" class="text-[10px] text-emerald-400 hover:underline"><i class="fa-solid fa-right-from-bracket"></i> Đổi tài khoản</button>
+                        </div>
+                    </div>
+
+                    <nav class="flex-1 p-2 space-y-1 overflow-y-auto custom-scrollbar">
+                        ${items.map(item => `
+                            <button onclick="app.navigateTo('${item.id}')" 
+                                    class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${this.currentView === item.id ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}">
+                                <i class="fa-solid ${item.icon} w-4 text-center"></i>
+                                <span>${item.label}</span>
+                            </button>
+                        `).join('')}
+                    </nav>
+
+                    <div class="p-3 border-t border-slate-800 text-[11px] text-slate-500 text-center">
+                        © 2026 Ôn Thi Nông Nghiệp 12
+                    </div>
+                `;
+            }
+
+            async renderMainContent() {
+                switch (this.currentView) {
+                    case 'teacher_dashboard': return await this.renderTeacherDashboard();
+                    case 'classes': return await this.renderClassesView();
+                    case 'students': return await this.renderStudentsView();
+                    case 'topics': return await this.renderTopicsView();
+                    case 'exams': return await this.renderExamsView();
+                    case 'question_bank': return await this.renderQuestionBankView();
+                    case 'assignments': return await this.renderAssignmentsView();
+                    case 'analytics': return await this.renderAnalyticsView();
+                    case 'backup': return await this.renderBackupView();
+                    case 'student_dashboard': return await this.renderStudentDashboard();
+                    case 'student_study': return await this.renderStudentStudyView();
+                    case 'student_exams': return await this.renderStudentExamsView();
+                    case 'student_take_exam': return await this.renderStudentTakeExamView();
+                    case 'student_results': return await this.renderStudentResultsView();
+                    case 'leaderboard': return await this.renderLeaderboardView();
+                    case 'student_history': return await this.renderStudentHistoryView();
+                    case 'guide': return this.renderGuideView();
+                    default: return '<div class="p-6">Đang tải giao diện...</div>';
+                }
+            }
+
+            async renderTeacherDashboard() {
+                const classes = await this.db.getAll('classes');
+                const students = await this.db.getAll('students');
+                const exams = await this.db.getAll('exams');
+                const topics = await this.db.getAll('topics');
+                const assignments = await this.db.getAll('assignments');
+                const attempts = await this.db.getAll('attempts');
+
+                // Compute Quick Analytics
+                const totalStudents = students.length;
+                const totalExams = exams.length;
+                const avgScore = attempts.length > 0 
+                    ? (attempts.reduce((sum, a) => sum + (a.score || 0), 0) / attempts.length).toFixed(1) 
+                    : 'N/A';
+                const needyStudents = students.filter(s => {
+                    const stdAttempts = attempts.filter(a => a.studentId === s.id);
+                    if (stdAttempts.length === 0) return true;
+                    const stdAvg = stdAttempts.reduce((sum, a) => sum + a.score, 0) / stdAttempts.length;
+                    return stdAvg < 5.0;
+                }).length;
+
+                setTimeout(() => this.initTeacherCharts(classes, attempts), 50);
+
+                return `
+                    <div class="space-y-6">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                            <div>
+                                <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                    👨‍🏫 Tổng Quan Quản Lý & Giảng Dạy
+                                </h1>
+                                <p class="text-xs text-slate-500 mt-0.5">Môn: Công nghệ Định hướng Nông nghiệp 12</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="app.navigateTo('assignments')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all shadow flex items-center gap-2">
+                                    <i class="fa-solid fa-paper-plane"></i> Giao Đề Ngay
+                                </button>
+                                <button onclick="app.resetDemoData()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-3 py-2 rounded-xl transition-all border">
+                                    <i class="fa-solid fa-rotate-left"></i> Nạp lại Dữ Liệu Demo
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Stats Overview Grid -->
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div class="bg-white p-4 rounded-xl border border-emerald-100 shadow-sm flex items-center gap-3">
+                                <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl font-bold">
+                                    👨‍🎓
+                                </div>
+                                <div>
+                                    <p class="text-xs font-medium text-slate-500">Tổng Học Sinh</p>
+                                    <h3 class="text-xl font-bold text-slate-800">${totalStudents} <span class="text-xs font-normal text-slate-400">em</span></h3>
+                                </div>
+                            </div>
+
+                            <div class="bg-white p-4 rounded-xl border border-teal-100 shadow-sm flex items-center gap-3">
+                                <div class="w-12 h-12 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center text-xl font-bold">
+                                    🏫
+                                </div>
+                                <div>
+                                    <p class="text-xs font-medium text-slate-500">Số Lớp Quản Lý</p>
+                                    <h3 class="text-xl font-bold text-slate-800">${classes.length} <span class="text-xs font-normal text-slate-400">lớp</span></h3>
+                                </div>
+                            </div>
+
+                            <div class="bg-white p-4 rounded-xl border border-amber-100 shadow-sm flex items-center gap-3">
+                                <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl font-bold">
+                                    📝
+                                </div>
+                                <div>
+                                    <p class="text-xs font-medium text-slate-500">Kho Đề Thi</p>
+                                    <h3 class="text-xl font-bold text-slate-800">${totalExams} <span class="text-xs font-normal text-slate-400">đề</span></h3>
+                                </div>
+                            </div>
+
+                            <div class="bg-white p-4 rounded-xl border border-rose-100 shadow-sm flex items-center gap-3">
+                                <div class="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl font-bold">
+                                    ⚠️
+                                </div>
+                                <div>
+                                    <p class="text-xs font-medium text-slate-500">Cần Hỗ Trợ</p>
+                                    <h3 class="text-xl font-bold text-rose-600">${needyStudents} <span class="text-xs font-normal text-slate-400">học sinh</span></h3>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Visual Charts Section -->
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                                <h3 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                    <i class="fa-solid fa-chart-bar text-emerald-600"></i> Điểm Trung Bình Theo Lớp Học
+                                </h3>
+                                <div class="h-64 relative">
+                                    <canvas id="classScoreChart"></canvas>
+                                </div>
+                            </div>
+
+                            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                                <h3 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                    <i class="fa-solid fa-chart-pie text-teal-600"></i> Phân Phối Tỷ Lệ Đạt Yêu Cầu
+                                </h3>
+                                <div class="h-64 relative">
+                                    <canvas id="passRateChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            initTeacherCharts(classes, attempts) {
+                // Class Average Chart
+                const ctx1 = document.getElementById('classScoreChart')?.getContext('2d');
+                if (ctx1) {
+                    const labels = classes.map(c => c.name);
+                    const scores = classes.map(c => {
+                        const stds = attempts.filter(a => a.classId === c.id);
+                        if (stds.length === 0) return 7.2; // default demo mean
+                        return (stds.reduce((sum, a) => sum + a.score, 0) / stds.length).toFixed(1);
+                    });
+
+                    new Chart(ctx1, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Điểm trung bình',
+                                data: scores,
+                                backgroundColor: '#22c55e',
+                                borderRadius: 8
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: { y: { min: 0, max: 10 } }
+                        }
+                    });
+                }
+
+                // Pass Rate Doughnut Chart
+                const ctx2 = document.getElementById('passRateChart')?.getContext('2d');
+                if (ctx2) {
+                    new Chart(ctx2, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Giỏi (>=8.0)', 'Khá (6.5-7.9)', 'Trung bình (5.0-6.4)', 'Yếu (<5.0)'],
+                            datasets: [{
+                                data: [35, 45, 15, 5],
+                                backgroundColor: ['#16a34a', '#0284c7', '#f59e0b', '#e11d48']
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false
+                        }
+                    });
+                }
+            }
+
+            async resetDemoData() {
+                if (confirm('Bạn có chắc chắn muốn nạp lại dữ liệu demo ban đầu? Dữ liệu tùy chỉnh của bạn sẽ được thay thế.')) {
+                    const stores = ['classes', 'students', 'topics', 'questions', 'exams', 'assignments', 'attempts'];
+                    for (let s of stores) await this.db.clearStore(s);
+                    await this.checkSeedData();
+                    this.toast('Đã nạp lại dữ liệu demo thành công!');
+                    this.render();
+                }
+            }
+
+            async renderClassesView() {
+                const classes = await this.db.getAll('classes');
+                const students = await this.db.getAll('students');
+
+                return `
+                    <div class="space-y-6">
+                        <div class="flex justify-between items-center bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                            <div>
+                                <h1 class="text-xl font-bold text-slate-800">🏫 Quản Lý Danh Sách Lớp Học</h1>
+                                <p class="text-xs text-slate-500">Tạo mới, quản lý mã lớp và gán giáo viên phụ trách</p>
+                            </div>
+                            <button onclick="app.openClassModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow flex items-center gap-2">
+                                <i class="fa-solid fa-plus"></i> Thêm Lớp Mới
+                            </button>
+                        </div>
+
+                        <!-- Classes Grid -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            ${classes.map(c => {
+                                const classStds = students.filter(s => s.classId === c.id);
+                                return `
+                                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col group hover:shadow-md transition-all">
+                                        <div class="h-32 bg-slate-200 relative overflow-hidden">
+                                            <img src="${c.coverImage || 'https://images.unsplash.com/photo-1586771107445-d3ca888129ff?w=600&auto=format&fit=crop'}" 
+                                                 alt="Cover" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                                            <div class="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent"></div>
+                                            <span class="absolute top-3 right-3 bg-white/90 text-slate-800 text-[10px] font-bold px-2 py-1 rounded-md shadow">
+                                                Mã: ${c.code}
+                                            </span>
+                                            <div class="absolute bottom-3 left-3 text-white">
+                                                <h3 class="font-bold text-base leading-tight">${c.name}</h3>
+                                                <p class="text-[11px] text-emerald-200 font-medium">${c.schoolYear || '2025-2026'}</p>
+                                            </div>
+                                        </div>
+
+                                        <div class="p-4 flex-1 flex flex-col justify-between space-y-3">
+                                            <p class="text-xs text-slate-600 line-clamp-2">${c.description || 'Chưa có mô tả chi tiết cho lớp học này.'}</p>
+                                            
+                                            <div class="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
+                                                <span><i class="fa-solid fa-user-graduate text-emerald-600"></i> ${classStds.length} Học sinh</span>
+                                                <span><i class="fa-solid fa-chalkboard-user text-teal-600"></i> ${c.teacherName || 'Chưa gán'}</span>
+                                            </div>
+
+                                            <div class="flex items-center gap-2 pt-2">
+                                                <button onclick="app.openClassModal('${c.id}')" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-2 rounded-lg transition-colors">
+                                                    <i class="fa-solid fa-pen-to-square"></i> Chỉnh sửa
+                                                </button>
+                                                <button onclick="app.deleteClass('${c.id}')" class="bg-rose-50 hover:bg-rose-100 text-rose-600 px-3 py-2 rounded-lg text-xs transition-colors title='Xóa lớp'">
+                                                    <i class="fa-solid fa-trash-can"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            async openClassModal(classId = null) {
+                let cls = { name: '', code: '', teacherName: '', schoolYear: '2025-2026', description: '', coverImage: '' };
+                if (classId) {
+                    cls = await this.db.get('classes', classId);
+                }
+
+                const modal = document.getElementById('modal-container');
+                modal.classList.remove('hidden');
+                modal.innerHTML = `
+                    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative border border-slate-200">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-lg text-slate-800">${classId ? '✏️ Sửa Thông Tin Lớp' : '➕ Thêm Lớp Học Mới'}</h3>
+                            <button onclick="document.getElementById('modal-container').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+                        </div>
+
+                        <form onsubmit="app.saveClass(event, '${classId || ''}')" class="space-y-4 text-xs">
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Tên Lớp Học *</label>
+                                <input type="text" id="cls-name" required value="${cls.name}" placeholder="Ví dụ: Lớp 12A1 Công nghệ cao" class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block font-semibold text-slate-700 mb-1">Mã Lớp *</label>
+                                    <input type="text" id="cls-code" required value="${cls.code}" placeholder="CN12A1" class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+                                </div>
+                                <div>
+                                    <label class="block font-semibold text-slate-700 mb-1">Năm Học</label>
+                                    <input type="text" id="cls-year" value="${cls.schoolYear}" placeholder="2025-2026" class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Giáo Viên Phụ Trách</label>
+                                <input type="text" id="cls-teacher" value="${cls.teacherName}" placeholder="ThS. Nguyễn Văn Lâm" class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+                            </div>
+
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Ảnh Bìa Lớp (URL hoặc Tải lên)</label>
+                                <input type="text" id="cls-cover" value="${cls.coverImage || ''}" placeholder="https://..." class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+                            </div>
+
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Mô Tả Lớp</label>
+                                <textarea id="cls-desc" rows="2" class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Mô tả định hướng môn học...">${cls.description || ''}</textarea>
+                            </div>
+
+                            <div class="flex justify-end gap-2 pt-2 border-t">
+                                <button type="button" onclick="document.getElementById('modal-container').classList.add('hidden')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg font-semibold text-slate-700">Hủy</button>
+                                <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold shadow">Lưu Lớp Học</button>
+                            </div>
+                        </form>
+                    </div>
+                `;
+            }
+
+            async saveClass(e, classId) {
+                e.preventDefault();
+                const cls = {
+                    id: classId || 'class_' + Date.now(),
+                    name: document.getElementById('cls-name').value,
+                    code: document.getElementById('cls-code').value,
+                    schoolYear: document.getElementById('cls-year').value,
+                    teacherName: document.getElementById('cls-teacher').value,
+                    coverImage: document.getElementById('cls-cover').value,
+                    description: document.getElementById('cls-desc').value
+                };
+
+                await this.db.put('classes', cls);
+                document.getElementById('modal-container').classList.add('hidden');
+                this.toast('Đã lưu thông tin lớp học!');
+                this.render();
+            }
+
+            async deleteClass(classId) {
+                const students = await this.db.getAll('students');
+                const classStds = students.filter(s => s.classId === classId);
+                
+                if (classStds.length > 0) {
+                    if (!confirm(`Lớp học này đang có ${classStds.length} học sinh. Bạn có chắc chắn muốn xóa không?`)) {
+                        return;
+                    }
+                } else {
+                    if (!confirm('Xác nhận xóa lớp học này?')) return;
+                }
+
+                await this.db.delete('classes', classId);
+                this.toast('Đã xóa lớp học!');
+                this.render();
+            }
+
+            async renderStudentsView() {
+                const students = await this.db.getAll('students');
+                const classes = await this.db.getAll('classes');
+
+                return `
+                    <div class="space-y-6">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                            <div>
+                                <h1 class="text-xl font-bold text-slate-800">👨‍🎓 Quản Lý Danh Sách Học Sinh</h1>
+                                <p class="text-xs text-slate-500">Thêm thủ công, nhập dữ liệu từ Excel (.xlsx) hoặc dán danh sách nhanh</p>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <button onclick="app.openStudentModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all shadow flex items-center gap-1.5">
+                                    <i class="fa-solid fa-plus"></i> Thêm Học Sinh
+                                </button>
+                                <button onclick="app.openExcelImportModal()" class="bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all shadow flex items-center gap-1.5">
+                                    <i class="fa-solid fa-file-excel"></i> Nhập từ Excel
+                                </button>
+                                <button onclick="app.openPasteStudentModal()" class="bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all shadow flex items-center gap-1.5">
+                                    <i class="fa-solid fa-clipboard-list"></i> Dán Danh Sách
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Table Filter Controls -->
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3">
+                            <div class="flex-1 relative">
+                                <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
+                                <input type="text" id="search-student" oninput="app.filterStudentTable()" placeholder="Tìm theo tên học sinh hoặc mã HS..." class="w-full pl-9 pr-3 py-2 border rounded-lg text-xs outline-none focus:ring-2 focus:ring-emerald-500">
+                            </div>
+                            <select id="filter-class" onchange="app.filterStudentTable()" class="border rounded-lg p-2 text-xs outline-none focus:ring-2 focus:ring-emerald-500">
+                                <option value="">Tất cả các Lớp</option>
+                                ${classes.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+                            </select>
+                        </div>
+
+                        <!-- Students Table -->
+                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse text-xs">
+                                    <thead>
+                                        <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
+                                            <th class="p-3">STT</th>
+                                            <th class="p-3">Mã HS</th>
+                                            <th class="p-3">Họ và Tên</th>
+                                            <th class="p-3">Lớp Học</th>
+                                            <th class="p-3">Giới tính</th>
+                                            <th class="p-3">Ghi chú</th>
+                                            <th class="p-3 text-center">Thao tác</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="student-table-body" class="divide-y divide-slate-100">
+                                        ${this.renderStudentRows(students, classes)}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            renderStudentRows(students, classes) {
+                if (students.length === 0) {
+                    return `<tr><td colspan="7" class="p-6 text-center text-slate-400">Chưa có dữ liệu học sinh nào. Hãy thêm mới hoặc nhập từ Excel!</td></tr>`;
+                }
+
+                return students.map((s, idx) => {
+                    const cls = classes.find(c => c.id === s.classId);
+                    return `
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="p-3 font-medium text-slate-400">${idx + 1}</td>
+                            <td class="p-3 font-bold text-emerald-700">${s.studentCode || 'N/A'}</td>
+                            <td class="p-3 font-bold text-slate-800 flex items-center gap-2">
+                                <div class="w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">
+                                    ${s.name.charAt(0)}
+                                </div>
+                                <span>${s.name}</span>
+                            </td>
+                            <td class="p-3"><span class="bg-slate-100 text-slate-700 font-semibold px-2 py-0.5 rounded">${cls ? cls.name : 'Chưa phân lớp'}</span></td>
+                            <td class="p-3 text-slate-600">${s.gender || 'Nam'}</td>
+                            <td class="p-3 text-slate-500 max-w-xs truncate">${s.notes || '-'}</td>
+                            <td class="p-3 text-center space-x-1">
+                                <button onclick="app.openStudentProfileModal('${s.id}')" class="text-teal-600 hover:text-teal-800 p-1 title='Xem hồ sơ học tập'">
+                                    <i class="fa-solid fa-address-card"></i>
+                                </button>
+                                <button onclick="app.openStudentModal('${s.id}')" class="text-slate-600 hover:text-slate-800 p-1 title='Sửa'">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                                <button onclick="app.deleteStudent('${s.id}')" class="text-rose-600 hover:text-rose-800 p-1 title='Xóa'">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            async filterStudentTable() {
+                const search = document.getElementById('search-student')?.value.toLowerCase() || '';
+                const classId = document.getElementById('filter-class')?.value || '';
+
+                let students = await this.db.getAll('students');
+                const classes = await this.db.getAll('classes');
+
+                if (search) {
+                    students = students.filter(s => s.name.toLowerCase().includes(search) || (s.studentCode && s.studentCode.toLowerCase().includes(search)));
+                }
+                if (classId) {
+                    students = students.filter(s => s.classId === classId);
+                }
+
+                const tbody = document.getElementById('student-table-body');
+                if (tbody) tbody.innerHTML = this.renderStudentRows(students, classes);
+            }
+
+            async openStudentModal(studentId = null) {
+                const classes = await this.db.getAll('classes');
+                let std = { name: '', studentCode: '', classId: classes[0]?.id || '', gender: 'Nam', notes: '' };
+                if (studentId) std = await this.db.get('students', studentId);
+
+                const modal = document.getElementById('modal-container');
+                modal.classList.remove('hidden');
+                modal.innerHTML = `
+                    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative border border-slate-200">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-lg text-slate-800">${studentId ? '✏️ Sửa Học Sinh' : '➕ Thêm Học Sinh Mới'}</h3>
+                            <button onclick="document.getElementById('modal-container').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+                        </div>
+
+                        <form onsubmit="app.saveStudent(event, '${studentId || ''}')" class="space-y-4 text-xs">
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Họ và Tên Học Sinh *</label>
+                                <input type="text" id="std-name" required value="${std.name}" placeholder="Nguyễn Văn A" class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block font-semibold text-slate-700 mb-1">Mã Học Sinh *</label>
+                                    <input type="text" id="std-code" required value="${std.studentCode}" placeholder="HS1201" class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+                                </div>
+                                <div>
+                                    <label class="block font-semibold text-slate-700 mb-1">Giới tính</label>
+                                    <select id="std-gender" class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+                                        <option value="Nam" ${std.gender === 'Nam' ? 'selected' : ''}>Nam</option>
+                                        <option value="Nữ" ${std.gender === 'Nữ' ? 'selected' : ''}>Nữ</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Thuộc Lớp Học *</label>
+                                <select id="std-class" required class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+                                    ${classes.map(c => `<option value="${c.id}" ${std.classId === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Ghi chú học tập</label>
+                                <textarea id="std-notes" rows="2" class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Ghi chú trình độ, năng lực...">${std.notes || ''}</textarea>
+                            </div>
+
+                            <div class="flex justify-end gap-2 pt-2 border-t">
+                                <button type="button" onclick="document.getElementById('modal-container').classList.add('hidden')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg font-semibold text-slate-700">Hủy</button>
+                                <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold shadow">Lưu Học Sinh</button>
+                            </div>
+                        </form>
+                    </div>
+                `;
+            }
+
+            async saveStudent(e, studentId) {
+                e.preventDefault();
+                const std = {
+                    id: studentId || 'std_' + Date.now(),
+                    name: document.getElementById('std-name').value,
+                    studentCode: document.getElementById('std-code').value,
+                    gender: document.getElementById('std-gender').value,
+                    classId: document.getElementById('std-class').value,
+                    notes: document.getElementById('std-notes').value
+                };
+
+                await this.db.put('students', std);
+                document.getElementById('modal-container').classList.add('hidden');
+                this.toast('Đã cập nhật thông tin học sinh!');
+                this.render();
+            }
+
+            async deleteStudent(studentId) {
+                if (!confirm('Xác nhận xóa học sinh này khỏi hệ thống?')) return;
+                await this.db.delete('students', studentId);
+                this.toast('Đã xóa học sinh!');
+                this.render();
+            }
+
+            openExcelImportModal() {
+                const modal = document.getElementById('modal-container');
+                modal.classList.remove('hidden');
+                modal.innerHTML = `
+                    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative border border-slate-200">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-lg text-slate-800">📥 Nhập Học Sinh Từ File Excel (.xlsx)</h3>
+                            <button onclick="document.getElementById('modal-container').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+                        </div>
+
+                        <div class="space-y-4 text-xs">
+                            <p class="text-slate-600">Chọn file Excel có các cột: <strong>Họ tên, Mã HS, Lớp, Giới tính</strong></p>
+                            
+                            <div class="border-2 border-dashed border-emerald-300 rounded-xl p-6 text-center bg-emerald-50/50 hover:bg-emerald-50 transition-colors">
+                                <i class="fa-solid fa-file-excel text-4xl text-emerald-600 mb-2"></i>
+                                <input type="file" id="excel-file-input" accept=".xlsx, .xls" class="hidden" onchange="app.handleExcelParsed(event)">
+                                <label for="excel-file-input" class="cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg inline-block shadow">
+                                    Chọn Tải Lên File Excel
+                                </label>
+                            </div>
+
+                            <div id="excel-preview" class="max-h-48 overflow-y-auto hidden border rounded-lg p-2 bg-slate-50"></div>
+
+                            <div class="flex justify-end gap-2 pt-2 border-t">
+                                <button onclick="document.getElementById('modal-container').classList.add('hidden')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg font-semibold text-slate-700">Đóng</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            handleExcelParsed(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = async (evt) => {
+                    try {
+                        const data = new Uint8Array(evt.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+                        if (jsonData.length === 0) {
+                            this.toast('File Excel không có dữ liệu!', 'error');
+                            return;
+                        }
+
+                        const classes = await this.db.getAll('classes');
+                        const defaultClassId = classes[0]?.id || 'class_12a1';
+
+                        let count = 0;
+                        for (let row of jsonData) {
+                            const name = row['Họ tên'] || row['Ho va ten'] || row['Họ và tên'] || row['Name'];
+                            if (name) {
+                                await this.db.put('students', {
+                                    id: 'std_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+                                    name: name,
+                                    studentCode: row['Mã HS'] || row['Ma HS'] || ('HS' + Math.floor(1000 + Math.random() * 9000)),
+                                    gender: row['Giới tính'] || 'Nam',
+                                    classId: defaultClassId,
+                                    notes: 'Nhập từ file Excel'
+                                });
+                                count++;
+                            }
+                        }
+
+                        this.toast(`Đã nhập thành công ${count} học sinh!`);
+                        document.getElementById('modal-container').classList.add('hidden');
+                        this.render();
+                    } catch (err) {
+                        this.toast('Không thể đọc file Excel. Vui lòng kiểm tra định dạng!', 'error');
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            }
+
+            openPasteStudentModal() {
+                const modal = document.getElementById('modal-container');
+                modal.classList.remove('hidden');
+                modal.innerHTML = `
+                    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative border border-slate-200">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-lg text-slate-800">📋 Dán Danh Sách Học Sinh</h3>
+                            <button onclick="document.getElementById('modal-container').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+                        </div>
+
+                        <div class="space-y-4 text-xs">
+                            <p class="text-slate-600">Dán danh sách tên học sinh (mỗi dòng 1 học sinh). Ví dụ:<br><code class="bg-slate-100 p-1 rounded font-mono">Nguyễn Văn An<br>Trần Thị Bình</code></p>
+                            
+                            <textarea id="paste-student-text" rows="8" class="w-full border rounded-xl p-3 outline-none focus:ring-2 focus:ring-emerald-500 font-sans" placeholder="Dán danh sách tại đây..."></textarea>
+
+                            <div class="flex justify-end gap-2 pt-2 border-t">
+                                <button onclick="document.getElementById('modal-container').classList.add('hidden')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg font-semibold text-slate-700">Hủy</button>
+                                <button onclick="app.savePastedStudents()" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold shadow">Lưu Danh Sách</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            async savePastedStudents() {
+                const text = document.getElementById('paste-student-text').value;
+                if (!text.trim()) return;
+
+                const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                const classes = await this.db.getAll('classes');
+                const defaultClassId = classes[0]?.id || 'class_12a1';
+
+                let count = 0;
+                for (let name of lines) {
+                    await this.db.put('students', {
+                        id: 'std_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+                        name: name,
+                        studentCode: 'HS' + Math.floor(1000 + Math.random() * 9000),
+                        gender: 'Nam',
+                        classId: defaultClassId,
+                        notes: 'Dán trực tiếp'
+                    });
+                    count++;
+                }
+
+                this.toast(`Đã thêm ${count} học sinh thành công!`);
+                document.getElementById('modal-container').classList.add('hidden');
+                this.render();
+            }
+
+            async openStudentProfileModal(studentId) {
+                const std = await this.db.get('students', studentId);
+                const attempts = (await this.db.getAll('attempts')).filter(a => a.studentId === studentId);
+                const avg = attempts.length > 0 ? (attempts.reduce((s, a) => s + a.score, 0) / attempts.length).toFixed(1) : 'N/A';
+
+                const modal = document.getElementById('modal-container');
+                modal.classList.remove('hidden');
+                modal.innerHTML = `
+                    <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl relative border border-slate-200">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-lg text-slate-800"> HỒ SƠ HỌC TẬP HỌC SINH</h3>
+                            <button onclick="document.getElementById('modal-container').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+                        </div>
+
+                        <div class="space-y-4 text-xs">
+                            <div class="flex items-center gap-4 bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                                <div class="w-14 h-14 rounded-full bg-emerald-600 text-white font-bold text-xl flex items-center justify-center">
+                                    ${std.name.charAt(0)}
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-base text-slate-800">${std.name}</h4>
+                                    <p class="text-slate-500">Mã HS: <strong>${std.studentCode}</strong> | Giới tính: ${std.gender}</p>
+                                    <span class="inline-block mt-1 bg-emerald-200 text-emerald-800 font-semibold px-2 py-0.5 rounded text-[11px]">
+                                        Điểm TB: ${avg} / 10
+                                    </span>
+                                </div>
+                            </div>
+
+                            <h5 class="font-bold text-slate-800 pt-2 border-t"> Lịch Sử Làm Bài Kiểm Tra</h5>
+                            <div class="max-h-48 overflow-y-auto space-y-2">
+                                ${attempts.length === 0 ? '<p class="text-slate-400 italic">Học sinh chưa hoàn thành bài thi nào.</p>' : attempts.map(a => `
+                                    <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border">
+                                        <div>
+                                            <p class="font-bold text-slate-700">${a.examTitle || 'Bài kiểm tra'}</p>
+                                            <p class="text-[10px] text-slate-400">${new Date(a.submittedAt).toLocaleString('vi-VN')}</p>
+                                        </div>
+                                        <div class="text-right">
+                                            <span class="font-bold text-sm ${a.score >= 5 ? 'text-emerald-600' : 'text-rose-600'}">${a.score.toFixed(1)} đ</span>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+
+                            <div class="flex justify-end pt-2 border-t">
+                                <button onclick="document.getElementById('modal-container').classList.add('hidden')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg font-semibold text-slate-700">Đóng</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            async renderTopicsView() {
+                const topics = await this.db.getAll('topics');
+
+                return `
+                    <div class="space-y-6">
+                        <div class="flex justify-between items-center bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                            <div>
+                                <h1 class="text-xl font-bold text-slate-800">📚 Danh Mục Chuyên Đề Ôn Tập</h1>
+                                <p class="text-xs text-slate-500">Quản lý các chủ đề Công nghệ Nông nghiệp 12 & nhập tài liệu Word (.docx)</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="app.openTopicModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow flex items-center gap-2">
+                                    <i class="fa-solid fa-plus"></i> Thêm Chuyên Đề
+                                </button>
+                                <button onclick="app.openDocxTopicImportModal()" class="bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow flex items-center gap-2">
+                                    <i class="fa-solid fa-file-word"></i> Nhập từ Word (.docx)
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            ${topics.map(t => `
+                                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                                    <div>
+                                        <div class="flex items-center justify-between mb-2">
+                                            <span class="bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+                                                Chuyên đề 12
+                                            </span>
+                                            <div class="space-x-1">
+                                                <button onclick="app.openTopicModal('${t.id}')" class="text-slate-400 hover:text-slate-600 p-1"><i class="fa-solid fa-pen"></i></button>
+                                                <button onclick="app.deleteTopic('${t.id}')" class="text-rose-400 hover:text-rose-600 p-1"><i class="fa-solid fa-trash"></i></button>
+                                            </div>
+                                        </div>
+                                        <h3 class="font-bold text-base text-slate-800 mb-2">${t.title}</h3>
+                                        <p class="text-xs text-slate-600 leading-relaxed">${t.description}</p>
+                                    </div>
+                                    <div class="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs text-slate-400">
+                                        <span><i class="fa-solid fa-book"></i> Lý thuyết & Ngân hàng câu hỏi</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            async openTopicModal(topicId = null) {
+                let t = { title: '', description: '' };
+                if (topicId) t = await this.db.get('topics', topicId);
+
+                const modal = document.getElementById('modal-container');
+                modal.classList.remove('hidden');
+                modal.innerHTML = `
+                    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative border border-slate-200">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-lg text-slate-800">${topicId ? '✏️ Sửa Chuyên Đề' : '➕ Thêm Chuyên Đề Mới'}</h3>
+                            <button onclick="document.getElementById('modal-container').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+                        </div>
+
+                        <form onsubmit="app.saveTopic(event, '${topicId || ''}')" class="space-y-4 text-xs">
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Tên Chuyên Đề *</label>
+                                <input type="text" id="topic-title" required value="${t.title}" placeholder="Chủ đề 1: Trồng trọt công nghệ cao..." class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+                            </div>
+
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Mô Tả Tóm Tắt Chuyên Đề</label>
+                                <textarea id="topic-desc" rows="3" class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Trọng tâm lý thuyết và ứng dụng...">${t.description}</textarea>
+                            </div>
+
+                            <div class="flex justify-end gap-2 pt-2 border-t">
+                                <button type="button" onclick="document.getElementById('modal-container').classList.add('hidden')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg font-semibold text-slate-700">Hủy</button>
+                                <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold shadow">Lưu Chuyên Đề</button>
+                            </div>
+                        </form>
+                    </div>
+                `;
+            }
+
+            async saveTopic(e, topicId) {
+                e.preventDefault();
+                const t = {
+                    id: topicId || 'topic_' + Date.now(),
+                    title: document.getElementById('topic-title').value,
+                    description: document.getElementById('topic-desc').value
+                };
+
+                await this.db.put('topics', t);
+                document.getElementById('modal-container').classList.add('hidden');
+                this.toast('Đã lưu chuyên đề!');
+                this.render();
+            }
+
+            async deleteTopic(topicId) {
+                if (!confirm('Xác nhận xóa chuyên đề này?')) return;
+                await this.db.delete('topics', topicId);
+                this.toast('Đã xóa chuyên đề!');
+                this.render();
+            }
+
+            openDocxTopicImportModal() {
+                const modal = document.getElementById('modal-container');
+                modal.classList.remove('hidden');
+                modal.innerHTML = `
+                    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative border border-slate-200">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-lg text-slate-800">📄 Nhập Nội Dung Từ File Word (.docx)</h3>
+                            <button onclick="document.getElementById('modal-container').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+                        </div>
+
+                        <div class="space-y-4 text-xs">
+                            <p class="text-slate-600">Chọn file .docx tài liệu lý thuyết hoặc chuyên đề để hệ thống tự phân tích văn bản.</p>
+                            
+                            <div class="border-2 border-dashed border-teal-300 rounded-xl p-6 text-center bg-teal-50/50 hover:bg-teal-50 transition-colors">
+                                <i class="fa-solid fa-file-word text-4xl text-teal-600 mb-2"></i>
+                                <input type="file" id="docx-file-input" accept=".docx" class="hidden" onchange="app.handleDocxParsed(event)">
+                                <label for="docx-file-input" class="cursor-pointer bg-teal-600 hover:bg-teal-700 text-white font-semibold px-4 py-2 rounded-lg inline-block shadow">
+                                    Chọn Tải Lên File Word (.docx)
+                                </label>
+                            </div>
+
+                            <div class="flex justify-end gap-2 pt-2 border-t">
+                                <button onclick="document.getElementById('modal-container').classList.add('hidden')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg font-semibold text-slate-700">Đóng</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            handleDocxParsed(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    const arrayBuffer = evt.target.result;
+                    mammoth.extractRawText({ arrayBuffer: arrayBuffer })
+                        .then(async (result) => {
+                            const text = result.value;
+                            if (!text || text.trim().length === 0) {
+                                this.toast('File Word không chứa văn bản!', 'error');
+                                return;
+                            }
+
+                            // Auto create a topic from parsed document
+                            const firstLine = text.split('\n')[0] || 'Chuyên đề Word Mới';
+                            await this.db.put('topics', {
+                                id: 'topic_' + Date.now(),
+                                title: firstLine.substring(0, 60),
+                                description: text.substring(0, 200) + '...'
+                            });
+
+                            this.toast('Đã trích xuất và lưu chuyên đề từ Word thành công!');
+                            document.getElementById('modal-container').classList.add('hidden');
+                            this.render();
+                        })
+                        .catch(() => this.toast('Lỗi khi đọc file Word (.docx)', 'error'));
+                };
+                reader.readAsArrayBuffer(file);
+            }
+
+            async renderQuestionBankView() {
+                const questions = await this.db.getAll('questions');
+                const topics = await this.db.getAll('topics');
+
+                return `
+                    <div class="space-y-6">
+                        <div class="flex justify-between items-center bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                            <div>
+                                <h1 class="text-xl font-bold text-slate-800">❓ Ngân Hàng Câu Hỏi Khắc Cốt Ghi Tâm</h1>
+                                <p class="text-xs text-slate-500">Quản lý câu hỏi trắc nghiệm, mức độ tư duy và lời giải chi tiết</p>
+                            </div>
+                            <button onclick="app.openQuestionModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow flex items-center gap-2">
+                                <i class="fa-solid fa-plus"></i> Thêm Câu Hỏi Mới
+                            </button>
+                        </div>
+
+                        <!-- Question List -->
+                        <div class="space-y-3">
+                            ${questions.map((q, idx) => {
+                                const topic = topics.find(t => t.id === q.topicId);
+                                return `
+                                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-2">
+                                        <div class="flex justify-between items-start gap-2">
+                                            <div class="flex items-center gap-2">
+                                                <span class="font-bold text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
+                                                    Câu ${idx + 1}
+                                                </span>
+                                                <span class="text-[11px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                                                    ${topic ? topic.title : 'Chưa phân chủ đề'}
+                                                </span>
+                                                <span class="text-[11px] bg-teal-50 text-teal-700 font-semibold px-2 py-0.5 rounded">
+                                                    ${q.cognitiveLevel || 'Thông hiểu'}
+                                                </span>
+                                            </div>
+                                            <div class="space-x-1">
+                                                <button onclick="app.openQuestionModal('${q.id}')" class="text-slate-400 hover:text-slate-600 p-1 text-xs"><i class="fa-solid fa-pen"></i></button>
+                                                <button onclick="app.deleteQuestion('${q.id}')" class="text-rose-400 hover:text-rose-600 p-1 text-xs"><i class="fa-solid fa-trash"></i></button>
+                                            </div>
+                                        </div>
+
+                                        <p class="font-bold text-xs text-slate-800">${q.content}</p>
+
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600 pl-2">
+                                            ${q.options.map(opt => `
+                                                <div class="${opt.startsWith(q.correctAnswer) ? 'font-bold text-emerald-700 bg-emerald-50/80 p-1.5 rounded border border-emerald-200' : 'p-1.5'}">
+                                                    ${opt} ${opt.startsWith(q.correctAnswer) ? '✓ (Đáp án đúng)' : ''}
+                                                </div>
+                                            `).join('')}
+                                        </div>
+
+                                        ${q.explanation ? `<p class="text-[11px] text-slate-500 italic bg-slate-50 p-2 rounded">💡 Lời giải: ${q.explanation}</p>` : ''}
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            async openQuestionModal(qId = null) {
+                const topics = await this.db.getAll('topics');
+                let q = {
+                    topicId: topics[0]?.id || '',
+                    content: '',
+                    cognitiveLevel: 'Thông hiểu',
+                    options: ['A. ', 'B. ', 'C. ', 'D. '],
+                    correctAnswer: 'A',
+                    explanation: ''
+                };
+
+                if (qId) q = await this.db.get('questions', qId);
+
+                const modal = document.getElementById('modal-container');
+                modal.classList.remove('hidden');
+                modal.innerHTML = `
+                    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative border border-slate-200">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-lg text-slate-800">${qId ? '✏️ Sửa Câu Hỏi' : '➕ Thêm Câu Hỏi Mới'}</h3>
+                            <button onclick="document.getElementById('modal-container').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+                        </div>
+
+                        <form onsubmit="app.saveQuestion(event, '${qId || ''}')" class="space-y-3 text-xs">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block font-semibold text-slate-700 mb-1">Thuộc Chuyên Đề *</label>
+                                    <select id="q-topic" required class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+                                        ${topics.map(t => `<option value="${t.id}" ${q.topicId === t.id ? 'selected' : ''}>${t.title}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block font-semibold text-slate-700 mb-1">Mức Độ Tư Duy</label>
+                                    <select id="q-level" class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+                                        <option value="Nhận biết" ${q.cognitiveLevel === 'Nhận biết' ? 'selected' : ''}>Nhận biết</option>
+                                        <option value="Thông hiểu" ${q.cognitiveLevel === 'Thông hiểu' ? 'selected' : ''}>Thông hiểu</option>
+                                        <option value="Vận dụng" ${q.cognitiveLevel === 'Vận dụng' ? 'selected' : ''}>Vận dụng</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Nội Dung Câu Hỏi *</label>
+                                <textarea id="q-content" required rows="3" class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Nhập câu hỏi...">${q.content}</textarea>
+                            </div>
+
+                            <div class="space-y-2">
+                                <label class="block font-semibold text-slate-700">Các Đáp Án (A, B, C, D) *</label>
+                                <input type="text" id="q-opt-A" value="${q.options[0] || 'A. '}" required class="w-full border rounded-lg p-2 outline-none">
+                                <input type="text" id="q-opt-B" value="${q.options[1] || 'B. '}" required class="w-full border rounded-lg p-2 outline-none">
+                                <input type="text" id="q-opt-C" value="${q.options[2] || 'C. '}" required class="w-full border rounded-lg p-2 outline-none">
+                                <input type="text" id="q-opt-D" value="${q.options[3] || 'D. '}" required class="w-full border rounded-lg p-2 outline-none">
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block font-semibold text-slate-700 mb-1">Đáp Án Đúng *</label>
+                                    <select id="q-correct" class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-emerald-700">
+                                        <option value="A" ${q.correctAnswer === 'A' ? 'selected' : ''}>Đáp án A</option>
+                                        <option value="B" ${q.correctAnswer === 'B' ? 'selected' : ''}>Đáp án B</option>
+                                        <option value="C" ${q.correctAnswer === 'C' ? 'selected' : ''}>Đáp án C</option>
+                                        <option value="D" ${q.correctAnswer === 'D' ? 'selected' : ''}>Đáp án D</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Lời Giải Chi Tiết</label>
+                                <textarea id="q-explanation" rows="2" class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Giải thích vì sao chọn đáp án này...">${q.explanation || ''}</textarea>
+                            </div>
+
+                            <div class="flex justify-end gap-2 pt-2 border-t">
+                                <button type="button" onclick="document.getElementById('modal-container').classList.add('hidden')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg font-semibold text-slate-700">Hủy</button>
+                                <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold shadow">Lưu Câu Hỏi</button>
+                            </div>
+                        </form>
+                    </div>
+                `;
+            }
+
+            async saveQuestion(e, qId) {
+                e.preventDefault();
+                const q = {
+                    id: qId || 'q_' + Date.now(),
+                    topicId: document.getElementById('q-topic').value,
+                    cognitiveLevel: document.getElementById('q-level').value,
+                    content: document.getElementById('q-content').value,
+                    options: [
+                        document.getElementById('q-opt-A').value,
+                        document.getElementById('q-opt-B').value,
+                        document.getElementById('q-opt-C').value,
+                        document.getElementById('q-opt-D').value
+                    ],
+                    correctAnswer: document.getElementById('q-correct').value,
+                    explanation: document.getElementById('q-explanation').value
+                };
+
+                await this.db.put('questions', q);
+                document.getElementById('modal-container').classList.add('hidden');
+                this.toast('Đã lưu câu hỏi!');
+                this.render();
+            }
+
+            async deleteQuestion(qId) {
+                if (!confirm('Xác nhận xóa câu hỏi này khỏi ngân hàng?')) return;
+                await this.db.delete('questions', qId);
+                this.toast('Đã xóa câu hỏi!');
+                this.render();
+            }
+
+            async renderExamsView() {
+                const exams = await this.db.getAll('exams');
+                const topics = await this.db.getAll('topics');
+
+                return `
+                    <div class="space-y-6">
+                        <div class="flex justify-between items-center bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                            <div>
+                                <h1 class="text-xl font-bold text-slate-800">📝 Kho Đề Thi Công Nghệ Nông Nghiệp</h1>
+                                <p class="text-xs text-slate-500">Tạo đề thủ công, chọn từ ngân hàng câu hỏi hoặc nhân bản nhanh</p>
+                            </div>
+                            <button onclick="app.openExamModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow flex items-center gap-2">
+                                <i class="fa-solid fa-plus"></i> Tạo Đề Thi Mới
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            ${exams.map(e => {
+                                const topic = topics.find(t => t.id === e.topicId);
+                                return `
+                                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+                                        <div>
+                                            <div class="flex justify-between items-start gap-2 mb-2">
+                                                <span class="bg-teal-100 text-teal-800 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+                                                    ⏱️ ${e.timeLimit} Phút | ${e.questionIds?.length || 0} Câu
+                                                </span>
+                                                <div class="space-x-1">
+                                                    <button onclick="app.openExamModal('${e.id}')" class="text-slate-400 hover:text-slate-600 p-1 text-xs"><i class="fa-solid fa-pen"></i></button>
+                                                    <button onclick="app.deleteExam('${e.id}')" class="text-rose-400 hover:text-rose-600 p-1 text-xs"><i class="fa-solid fa-trash"></i></button>
+                                                </div>
+                                            </div>
+                                            <h3 class="font-bold text-base text-slate-800">${e.title}</h3>
+                                            <p class="text-xs text-slate-500 mt-1">Chủ đề: <strong>${topic ? topic.title : 'Tổng hợp'}</strong></p>
+                                        </div>
+
+                                        <div class="pt-3 border-t flex gap-2">
+                                            <button onclick="app.assignExamDirectly('${e.id}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 rounded-lg transition-all shadow">
+                                                🚀 Giao Đề Cho Lớp
+                                            </button>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            async openExamModal(examId = null) {
+                const questions = await this.db.getAll('questions');
+                const topics = await this.db.getAll('topics');
+
+                let ex = {
+                    title: '',
+                    topicId: topics[0]?.id || '',
+                    timeLimit: 15,
+                    questionIds: questions.map(q => q.id)
+                };
+
+                if (examId) ex = await this.db.get('exams', examId);
+
+                const modal = document.getElementById('modal-container');
+                modal.classList.remove('hidden');
+                modal.innerHTML = `
+                    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative border border-slate-200">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-lg text-slate-800">${examId ? '✏️ Sửa Đề Thi' : '➕ Tạo Đề Thi Mới'}</h3>
+                            <button onclick="document.getElementById('modal-container').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+                        </div>
+
+                        <form onsubmit="app.saveExam(event, '${examId || ''}')" class="space-y-4 text-xs">
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Tên Đề Thi *</label>
+                                <input type="text" id="ex-title" required value="${ex.title}" placeholder="Đề kiểm tra trắc nghiệm..." class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block font-semibold text-slate-700 mb-1">Chuyên Đề Chính</label>
+                                    <select id="ex-topic" class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+                                        ${topics.map(t => `<option value="${t.id}" ${ex.topicId === t.id ? 'selected' : ''}>${t.title}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block font-semibold text-slate-700 mb-1">Thời Gian Làm Bài (Phút) *</label>
+                                    <input type="number" id="ex-time" min="1" max="180" required value="${ex.timeLimit}" class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Chọn Câu Hỏi Trong Ngân Hàng (${questions.length} câu)</label>
+                                <div class="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-1">
+                                    ${questions.map(q => `
+                                        <label class="flex items-center gap-2 p-1 hover:bg-slate-50 cursor-pointer">
+                                            <input type="checkbox" name="ex-questions" value="${q.id}" ${ex.questionIds.includes(q.id) ? 'checked' : ''} class="rounded text-emerald-600">
+                                            <span class="truncate">${q.content}</span>
+                                        </label>
+                                    `).join('')}
+                                </div>
+                            </div>
+
+                            <div class="flex justify-end gap-2 pt-2 border-t">
+                                <button type="button" onclick="document.getElementById('modal-container').classList.add('hidden')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg font-semibold text-slate-700">Hủy</button>
+                                <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold shadow">Lưu Đề Thi</button>
+                            </div>
+                        </form>
+                    </div>
+                `;
+            }
+
+            async saveExam(e, examId) {
+                e.preventDefault();
+                const selectedQ = Array.from(document.querySelectorAll('input[name="ex-questions"]:checked')).map(cb => cb.value);
+
+                if (selectedQ.length === 0) {
+                    this.toast('Vui lòng chọn ít nhất 1 câu hỏi cho đề thi!', 'error');
+                    return;
+                }
+
+                const ex = {
+                    id: examId || 'exam_' + Date.now(),
+                    title: document.getElementById('ex-title').value,
+                    topicId: document.getElementById('ex-topic').value,
+                    timeLimit: parseInt(document.getElementById('ex-time').value) || 15,
+                    questionIds: selectedQ,
+                    createdByName: this.currentUser.name
+                };
+
+                await this.db.put('exams', ex);
+                document.getElementById('modal-container').classList.add('hidden');
+                this.toast('Đã lưu đề thi thành công!');
+                this.render();
+            }
+
+            async deleteExam(examId) {
+                if (!confirm('Xác nhận xóa đề thi này?')) return;
+                await this.db.delete('exams', examId);
+                this.toast('Đã xóa đề thi!');
+                this.render();
+            }
+
+            async assignExamDirectly(examId) {
+                const classes = await this.db.getAll('classes');
+                const ex = await this.db.get('exams', examId);
+
+                const modal = document.getElementById('modal-container');
+                modal.classList.remove('hidden');
+                modal.innerHTML = `
+                    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative border border-slate-200">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-lg text-slate-800">🚀 Giao Bài Kiểm Tra</h3>
+                            <button onclick="document.getElementById('modal-container').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+                        </div>
+
+                        <form onsubmit="app.confirmAssign(event, '${examId}')" class="space-y-4 text-xs">
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Đề Thi Chọn</label>
+                                <input type="text" disabled value="${ex.title}" class="w-full bg-slate-100 border rounded-lg p-2.5 font-bold text-slate-700">
+                            </div>
+
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Giao Cho Lớp Học *</label>
+                                <select id="asgn-class" required class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+                                    ${classes.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+                                </select>
+                            </div>
+
+                            <div class="flex justify-end gap-2 pt-2 border-t">
+                                <button type="button" onclick="document.getElementById('modal-container').classList.add('hidden')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg font-semibold text-slate-700">Hủy</button>
+                                <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold shadow">Xác Nhận Giao Đề</button>
+                            </div>
+                        </form>
+                    </div>
+                `;
+            }
+
+            async confirmAssign(e, examId) {
+                e.preventDefault();
+                const ex = await this.db.get('exams', examId);
+                const classId = document.getElementById('asgn-class').value;
+
+                await this.db.put('assignments', {
+                    id: 'assign_' + Date.now(),
+                    examId: examId,
+                    classId: classId,
+                    title: ex.title,
+                    startTime: new Date().toISOString(),
+                    endTime: new Date(Date.now() + 3600000 * 24 * 7).toISOString()
+                });
+
+                document.getElementById('modal-container').classList.add('hidden');
+                this.toast('Đã giao bài thi thành công!');
+                this.navigateTo('assignments');
+            }
+
+            async renderAssignmentsView() {
+                const assignments = await this.db.getAll('assignments');
+                const classes = await this.db.getAll('classes');
+
+                return `
+                    <div class="space-y-6">
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                            <h1 class="text-xl font-bold text-slate-800">📤 Quản Lý Bài Đã Giao</h1>
+                            <p class="text-xs text-slate-500">Theo dõi thời hạn và trạng thái hoàn thành của học sinh</p>
+                        </div>
+
+                        <div class="space-y-3">
+                            ${assignments.map(a => {
+                                const cls = classes.find(c => c.id === a.classId);
+                                return `
+                                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                        <div>
+                                            <span class="bg-emerald-100 text-emerald-800 font-bold text-[10px] px-2 py-0.5 rounded">
+                                                Lớp: ${cls ? cls.name : 'Tất cả'}
+                                            </span>
+                                            <h3 class="font-bold text-sm text-slate-800 mt-1">${a.title}</h3>
+                                            <p class="text-xs text-slate-400">Hạn nộp: ${new Date(a.endTime).toLocaleDateString('vi-VN')}</p>
+                                        </div>
+                                        <button onclick="app.deleteAssignment('${a.id}')" class="text-rose-600 hover:text-rose-800 text-xs font-semibold">
+                                            <i class="fa-solid fa-trash"></i> Hủy giao
+                                        </button>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            async deleteAssignment(aId) {
+                if (!confirm('Xác nhận hủy bài giao này?')) return;
+                await this.db.delete('assignments', aId);
+                this.toast('Đã hủy bài giao!');
+                this.render();
+            }
+
+            async renderAnalyticsView() {
+                const attempts = await this.db.getAll('attempts');
+                const students = await this.db.getAll('students');
+
+                return `
+                    <div class="space-y-6">
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                            <h1 class="text-xl font-bold text-slate-800">📊 Báo Cáo & Phân Tích Học Tập</h1>
+                            <p class="text-xs text-slate-500">Tổng hợp danh sách kết quả học sinh & xuất báo cáo Excel</p>
+                        </div>
+
+                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="font-bold text-sm text-slate-800">Lịch Sử Bài Làm Chi Tiết</h3>
+                                <button onclick="app.exportResultsExcel()" class="bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow">
+                                    <i class="fa-solid fa-file-excel"></i> Xuất Kết Quả Excel
+                                </button>
+                            </div>
+
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse text-xs">
+                                    <thead>
+                                        <tr class="bg-slate-50 border-b font-bold text-slate-600">
+                                            <th class="p-2.5">Thời gian</th>
+                                            <th class="p-2.5">Học sinh</th>
+                                            <th class="p-2.5">Tên đề thi</th>
+                                            <th class="p-2.5">Điểm số</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y">
+                                        ${attempts.map(a => {
+                                            const std = students.find(s => s.id === a.studentId);
+                                            return `
+                                                <tr>
+                                                    <td class="p-2.5 text-slate-400">${new Date(a.submittedAt).toLocaleString('vi-VN')}</td>
+                                                    <td class="p-2.5 font-bold text-slate-800">${std ? std.name : 'N/A'}</td>
+                                                    <td class="p-2.5">${a.examTitle}</td>
+                                                    <td class="p-2.5 font-bold ${a.score >= 5 ? 'text-emerald-600' : 'text-rose-600'}">${a.score.toFixed(1)} đ</td>
+                                                </tr>
+                                            `;
+                                        }).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            async exportResultsExcel() {
+                const attempts = await this.db.getAll('attempts');
+                const students = await this.db.getAll('students');
+
+                const data = attempts.map(a => {
+                    const std = students.find(s => s.id === a.studentId);
+                    return {
+                        'Thời Gian': new Date(a.submittedAt).toLocaleString('vi-VN'),
+                        'Tên Học Sinh': std ? std.name : 'N/A',
+                        'Mã HS': std ? std.studentCode : '',
+                        'Bài Kiểm Tra': a.examTitle,
+                        'Điểm Số': a.score.toFixed(1)
+                    };
+                });
+
+                const ws = XLSX.utils.json_to_sheet(data);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "KetQuaOnThi");
+                XLSX.writeFile(wb, "KetQua_CongNghe12.xlsx");
+                this.toast('Đã xuất file Excel kết quả thành công!');
+            }
+
+            async renderBackupView() {
+                return `
+                    <div class="space-y-6">
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                            <h1 class="text-xl font-bold text-slate-800">💾 Sao Lưu & Khôi Phục Dữ Liệu</h1>
+                            <p class="text-xs text-slate-500">Xuất file dự phòng JSON an toàn và khôi phục khi chuyển máy tính</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm text-center space-y-3">
+                                <i class="fa-solid fa-file-export text-4xl text-emerald-600"></i>
+                                <h3 class="font-bold text-base text-slate-800">Xuất Backup Dữ Liệu (.json)</h3>
+                                <p class="text-xs text-slate-500">Tải về toàn bộ danh sách lớp, học sinh, câu hỏi và điểm số vào file máy tính.</p>
+                                <button onclick="app.exportBackupJSON()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow transition-all">
+                                    <i class="fa-solid fa-download"></i> Tải Về File Backup JSON
+                                </button>
+                            </div>
+
+                            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm text-center space-y-3">
+                                <i class="fa-solid fa-file-import text-4xl text-teal-600"></i>
+                                <h3 class="font-bold text-base text-slate-800">Khôi Phục Từ Backup (.json)</h3>
+                                <p class="text-xs text-slate-500">Nạp lại toàn bộ dữ liệu từ file sao lưu JSON đã tải về trước đó.</p>
+                                <input type="file" id="restore-json-input" accept=".json" class="hidden" onchange="app.importBackupJSON(event)">
+                                <label for="restore-json-input" class="cursor-pointer bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow inline-block transition-all">
+                                    <i class="fa-solid fa-upload"></i> Chọn File JSON Để Khôi Phục
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            async exportBackupJSON() {
+                const stores = ['classes', 'students', 'topics', 'questions', 'exams', 'assignments', 'attempts'];
+                const backup = {};
+
+                for (let s of stores) {
+                    backup[s] = await this.db.getAll(s);
+                }
+
+                const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `backup_cong_nghe_12_${new Date().toISOString().slice(0,10)}.json`;
+                a.click();
+                this.toast('Đã xuất file sao lưu JSON thành công!');
+            }
+
+            async importBackupJSON(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = async (evt) => {
+                    try {
+                        const data = JSON.parse(evt.target.result);
+                        if (confirm('Khôi phục backup sẽ ghi đè dữ liệu hiện tại. Bạn muốn tiếp tục?')) {
+                            for (let storeName in data) {
+                                await this.db.clearStore(storeName);
+                                for (let item of data[storeName]) {
+                                    await this.db.put(storeName, item);
+                                }
+                            }
+                            this.toast('Đã khôi phục dữ liệu sao lưu thành công!');
+                            this.render();
+                        }
+                    } catch (err) {
+                        this.toast('File backup JSON không hợp lệ!', 'error');
+                    }
+                };
+                reader.readAsText(file);
+            }
+
+            async renderStudentDashboard() {
+                const student = await this.db.get('students', this.currentUser.id);
+                const assignments = await this.db.getAll('assignments');
+                const attempts = (await this.db.getAll('attempts')).filter(a => a.studentId === this.currentUser.id);
+
+                const avg = attempts.length > 0 
+                    ? (attempts.reduce((sum, a) => sum + a.score, 0) / attempts.length).toFixed(1)
+                    : 'Chưa có';
+
+                return `
+                    <div class="space-y-6">
+                        <!-- Welcome Greeting Banner -->
+                        <div class="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-800 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
+                            <div class="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                <div>
+                                    <span class="bg-white/20 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm">🌱 Học Sinh Lớp 12</span>
+                                    <h1 class="text-2xl font-bold mt-2">Chào mừng, ${student ? student.name : 'Học sinh'}! 👋</h1>
+                                    <p class="text-xs text-emerald-100 mt-1">Sẵn sàng ôn luyện môn Công nghệ Nông nghiệp đạt kết quả cao nhất!</p>
+                                </div>
+                                <div class="bg-white/10 backdrop-blur-md p-3 rounded-xl border border-white/20 text-center min-w-[120px]">
+                                    <p class="text-[11px] text-emerald-200">Điểm Trung Bình</p>
+                                    <p class="text-2xl font-bold">${avg}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Student Assignments Section -->
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                            <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <i class="fa-solid fa-pen-to-square text-emerald-600"></i> Bài Thi Đã Được Giao (${assignments.length})
+                            </h3>
+
+                            <div class="space-y-3">
+                                ${assignments.map(a => `
+                                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-50 p-4 rounded-xl border border-slate-200 gap-3 hover:border-emerald-300 transition-colors">
+                                        <div>
+                                            <h4 class="font-bold text-slate-800 text-sm">${a.title}</h4>
+                                            <p class="text-xs text-slate-400 mt-0.5"><i class="fa-regular fa-clock"></i> Hạn chót: ${new Date(a.endTime).toLocaleDateString('vi-VN')}</p>
+                                        </div>
+                                        <button onclick="app.startExamSession('${a.examId}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg shadow transition-all">
+                                            ▶️ Làm Bài Ngay
+                                        </button>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            async renderStudentStudyView() {
+                const topics = await this.db.getAll('topics');
+
+                return `
+                    <div class="space-y-6">
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                            <h1 class="text-xl font-bold text-slate-800">📚 Ôn Tập Chuyên Đề Nông Nghiệp 12</h1>
+                            <p class="text-xs text-slate-500">Đọc nội dung tóm tắt & củng cố kiến thức từng chủ đề</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            ${topics.map(t => `
+                                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+                                    <h3 class="font-bold text-base text-emerald-800">${t.title}</h3>
+                                    <p class="text-xs text-slate-600 leading-relaxed">${t.description}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            async renderStudentExamsView() {
+                const assignments = await this.db.getAll('assignments');
+                return `
+                    <div class="space-y-6">
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                            <h1 class="text-xl font-bold text-slate-800">📝 Danh Sách Bài Tập Được Giao</h1>
+                        </div>
+                        <div class="space-y-3">
+                            ${assignments.map(a => `
+                                <div class="bg-white p-4 rounded-xl border border-slate-200 flex justify-between items-center">
+                                    <div>
+                                        <h3 class="font-bold text-slate-800 text-sm">${a.title}</h3>
+                                    </div>
+                                    <button onclick="app.startExamSession('${a.examId}')" class="bg-emerald-600 text-white font-bold text-xs px-4 py-2 rounded-lg">
+                                        Làm Bài
+                                    </button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            async startExamSession(examId) {
+                const exam = await this.db.get('exams', examId);
+                const questions = [];
+
+                for (let qId of exam.questionIds) {
+                    const q = await this.db.get('questions', qId);
+                    if (q) questions.push(q);
+                }
+
+                this.activeExamSession = {
+                    exam: exam,
+                    questions: questions,
+                    userAnswers: {},
+                    startTime: Date.now(),
+                    timeRemainingSeconds: exam.timeLimit * 60,
+                    isSubmitted: false
+                };
+
+                this.navigateTo('student_take_exam');
+            }
+
+            async renderStudentTakeExamView() {
+                if (!this.activeExamSession) return '<div class="p-6">Không tìm thấy phiên làm bài thi.</div>';
+
+                const sess = this.activeExamSession;
+                setTimeout(() => this.startExamTimer(), 100);
+
+                return `
+                    <div class="space-y-6 max-w-4xl mx-auto">
+                        <!-- Sticky Header with Countdown -->
+                        <div class="sticky top-10 bg-slate-900 text-white p-4 rounded-2xl shadow-xl flex justify-between items-center z-30">
+                            <div>
+                                <h2 class="font-bold text-sm text-emerald-400">${sess.exam.title}</h2>
+                                <p class="text-[11px] text-slate-400">${sess.questions.length} câu hỏi trắc nghiệm</p>
+                            </div>
+                            <div class="bg-slate-800 px-4 py-2 rounded-xl border border-slate-700 text-center">
+                                <p class="text-[10px] text-slate-400 uppercase">Thời Gian Còn Lại</p>
+                                <p id="exam-timer-text" class="font-mono text-xl font-bold text-amber-400">--:--</p>
+                            </div>
+                        </div>
+
+                        <!-- Questions Container -->
+                        <div class="space-y-4">
+                            ${sess.questions.map((q, idx) => `
+                                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                                    <p class="font-bold text-sm text-slate-800">
+                                        <span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-xs">Câu ${idx + 1}</span> 
+                                        ${q.content}
+                                    </p>
+
+                                    <div class="space-y-2 text-xs">
+                                        ${q.options.map(opt => {
+                                            const letter = opt.charAt(0);
+                                            const checked = sess.userAnswers[q.id] === letter ? 'checked' : '';
+                                            return `
+                                                <label class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:bg-emerald-50/50 cursor-pointer transition-colors">
+                                                    <input type="radio" name="q_${q.id}" value="${letter}" ${checked} onchange="app.saveExamAnswer('${q.id}', '${letter}')" class="text-emerald-600 focus:ring-emerald-500">
+                                                    <span class="font-medium text-slate-700">${opt}</span>
+                                                </label>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        <!-- Submit Button Footer -->
+                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center sticky bottom-4">
+                            <span class="text-xs text-slate-500"><i class="fa-solid fa-floppy-disk text-emerald-600"></i> Bài làm tự động lưu</span>
+                            <button onclick="app.confirmSubmitExam()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-6 py-3 rounded-xl shadow-lg transition-all">
+                                📤 NỘP BÀI THI
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            saveExamAnswer(qId, answerLetter) {
+                if (!this.activeExamSession) return;
+                this.activeExamSession.userAnswers[qId] = answerLetter;
+                this.showSaveIndicator();
+            }
+
+            startExamTimer() {
+                if (this.timerInterval) clearInterval(this.timerInterval);
+
+                this.timerInterval = setInterval(() => {
+                    if (!this.activeExamSession || this.activeExamSession.isSubmitted) {
+                        clearInterval(this.timerInterval);
+                        return;
+                    }
+
+                    this.activeExamSession.timeRemainingSeconds--;
+                    const secs = this.activeExamSession.timeRemainingSeconds;
+
+                    const timerEl = document.getElementById('exam-timer-text');
+                    if (timerEl) {
+                        const m = Math.floor(secs / 60);
+                        const s = secs % 60;
+                        timerEl.innerText = `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+                    }
+
+                    if (secs <= 0) {
+                        clearInterval(this.timerInterval);
+                        this.toast('Đã hết thời gian làm bài! Hệ thống tự động nộp bài.', 'error');
+                        this.submitActiveExam();
+                    }
+                }, 1000);
+            }
+
+            async confirmSubmitExam() {
+                if (confirm('Bạn có chắc chắn muốn nộp bài thi?')) {
+                    await this.submitActiveExam();
+                }
+            }
+
+            async submitActiveExam() {
+                if (!this.activeExamSession) return;
+                this.activeExamSession.isSubmitted = true;
+                if (this.timerInterval) clearInterval(this.timerInterval);
+
+                const sess = this.activeExamSession;
+                let correctCount = 0;
+
+                sess.questions.forEach(q => {
+                    if (sess.userAnswers[q.id] === q.correctAnswer) {
+                        correctCount++;
+                    }
+                });
+
+                const totalQ = sess.questions.length;
+                const score = totalQ > 0 ? (correctCount / totalQ) * 10 : 0;
+
+                const attemptRecord = {
+                    id: 'attempt_' + Date.now(),
+                    studentId: this.currentUser.id,
+                    examId: sess.exam.id,
+                    examTitle: sess.exam.title,
+                    score: score,
+                    correctCount: correctCount,
+                    totalQuestions: totalQ,
+                    submittedAt: new Date().toISOString(),
+                    userAnswers: sess.userAnswers
+                };
+
+                await this.db.put('attempts', attemptRecord);
+                
+                if (score >= 8.0 && typeof confetti === 'function') {
+                    confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+                }
+
+                this.toast(`Đã nộp bài! Điểm số của bạn: ${score.toFixed(1)} / 10`);
+                this.navigateTo('student_results', { attempt: attemptRecord, questions: sess.questions });
+            }
+
+            async renderStudentResultsView() {
+                const params = this.viewParams || {};
+                const attempt = params.attempt;
+                const questions = params.questions || [];
+
+                if (!attempt) return '<div class="p-6">Không tìm thấy thông tin kết quả bài làm.</div>';
+
+                return `
+                    <div class="space-y-6 max-w-2xl mx-auto">
+                        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm text-center space-y-3">
+                            <div class="w-20 h-20 rounded-full ${attempt.score >= 5 ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'} mx-auto flex items-center justify-center font-bold text-3xl">
+                                ${attempt.score.toFixed(1)}
+                            </div>
+                            <h2 class="font-bold text-xl text-slate-800">🎉 Kết Quả Bài Làm Của Bạn</h2>
+                            <p class="text-xs text-slate-500">Đúng ${attempt.correctCount} / ${attempt.totalQuestions} câu trắc nghiệm</p>
+                        </div>
+
+                        <!-- Review Answers -->
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                            <h3 class="font-bold text-sm text-slate-800">📝 Chi Tiết Câu Hỏi & Đáp Án</h3>
+                            <div class="space-y-3">
+                                ${questions.map((q, idx) => {
+                                    const userAns = attempt.userAnswers[q.id];
+                                    const isCorrect = userAns === q.correctAnswer;
+                                    return `
+                                        <div class="p-3 rounded-xl border ${isCorrect ? 'border-emerald-200 bg-emerald-50/50' : 'border-rose-200 bg-rose-50/50'} text-xs space-y-1">
+                                            <p class="font-bold text-slate-800">Câu ${idx + 1}: ${q.content}</p>
+                                            <p class="text-slate-600">Lựa chọn của bạn: <strong>${userAns || 'Bỏ trống'}</strong></p>
+                                            <p class="text-emerald-700 font-bold">Đáp án đúng: ${q.correctAnswer}</p>
+                                            ${q.explanation ? `<p class="text-[11px] text-slate-500 italic mt-1">💡 Lời giải: ${q.explanation}</p>` : ''}
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+
+                        <div class="text-center">
+                            <button onclick="app.navigateTo('student_dashboard')" class="bg-emerald-600 text-white font-bold text-xs px-6 py-2.5 rounded-xl shadow">
+                                Quay Về Trang Chủ
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            async renderLeaderboardView() {
+                const students = await this.db.getAll('students');
+                const attempts = await this.db.getAll('attempts');
+
+                const ranked = students.map(s => {
+                    const stdAttempts = attempts.filter(a => a.studentId === s.id);
+                    const avg = stdAttempts.length > 0 
+                        ? (stdAttempts.reduce((sum, a) => sum + a.score, 0) / stdAttempts.length)
+                        : 0;
+                    return { student: s, avgScore: avg, count: stdAttempts.length };
+                }).sort((a, b) => b.avgScore - a.avgScore);
+
+                return `
+                    <div class="space-y-6">
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                            <h1 class="text-xl font-bold text-slate-800">🏆 Bảng Xếp Hạng Học Tập</h1>
+                            <p class="text-xs text-slate-500">Tuyên dương các học sinh có điểm trung bình thi xuất sắc nhất</p>
+                        </div>
+
+                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+                            <div class="space-y-2">
+                                ${ranked.map((item, idx) => `
+                                    <div class="flex items-center justify-between p-3 rounded-xl border ${idx === 0 ? 'bg-amber-50 border-amber-200' : 'bg-slate-50'}">
+                                        <div class="flex items-center gap-3">
+                                            <span class="font-bold text-sm w-6 text-center ${idx === 0 ? 'text-amber-600' : 'text-slate-400'}">
+                                                ${idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}
+                                            </span>
+                                            <span class="font-bold text-xs text-slate-800">${item.student.name}</span>
+                                        </div>
+                                        <div class="text-right">
+                                            <span class="font-bold text-sm text-emerald-600">${item.avgScore.toFixed(1)} đ</span>
+                                            <p class="text-[10px] text-slate-400">${item.count} bài thi</p>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            async renderStudentHistoryView() {
+                const attempts = (await this.db.getAll('attempts')).filter(a => a.studentId === this.currentUser.id);
+
+                return `
+                    <div class="space-y-6">
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                            <h1 class="text-xl font-bold text-slate-800">⏱️ Lịch Sử Làm Bài Cá Nhân</h1>
+                        </div>
+
+                        <div class="space-y-2">
+                            ${attempts.map(a => `
+                                <div class="bg-white p-4 rounded-xl border border-slate-200 flex justify-between items-center">
+                                    <div>
+                                        <h4 class="font-bold text-slate-800 text-sm">${a.examTitle}</h4>
+                                        <p class="text-xs text-slate-400">${new Date(a.submittedAt).toLocaleString('vi-VN')}</p>
+                                    </div>
+                                    <span class="font-bold text-emerald-600">${a.score.toFixed(1)} đ</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            renderGuideView() {
+                return `
+                    <div class="space-y-6 max-w-3xl mx-auto">
+                        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-xs leading-relaxed text-slate-600">
+                            <h2 class="font-bold text-lg text-slate-800">❓ Hướng Dẫn Sử Dụng Ứng Dụng Ôn Thi Công Nghệ 12</h2>
+                            
+                            <div class="space-y-2">
+                                <h3 class="font-bold text-slate-800 text-sm text-emerald-700">Dành Cho Giáo Viên:</h3>
+                                <p>1. <strong>Quản lý Lớp & Học Sinh:</strong> Thêm thủ công, nạp file Excel (.xlsx) hoặc dán danh sách tên học sinh trực tiếp.</p>
+                                <p>2. <strong>Quản lý Đề & Câu Hỏi:</strong> Tạo câu hỏi trắc nghiệm kèm lời giải. Trích xuất tài liệu Word (.docx) để tạo chuyên đề ôn tập.</p>
+                                <p>3. <strong>Giao Đề & Xuất Báo Cáo:</strong> Giao bài thi cho lớp học, tự động chấm điểm và xuất file Excel kết quả tổng hợp.</p>
+                            </div>
+
+                            <div class="space-y-2 border-t pt-3">
+                                <h3 class="font-bold text-slate-800 text-sm text-teal-700">Dành Cho Học Sinh:</h3>
+                                <p>1. <strong>Làm Bài Trực Tuyến:</strong> Bài thi có đồng hồ đếm ngược và tính năng tự động lưu từng câu trả lời vào máy tính.</p>
+                                <p>2. <strong>Xem Đáp Án & Lời Giải:</strong> Xem ngay điểm số, câu sai và lời giải giải thích chi tiết sau khi nộp bài.</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // Initialize Global App Instance
+        const app = new AgriApp();
+        window.onload = () => app.start();
+    </script>
+</body>
+</html>
